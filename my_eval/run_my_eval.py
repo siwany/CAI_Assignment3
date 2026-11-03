@@ -169,7 +169,10 @@ def main():
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
-        "--query-mode", type=str, default=None, help="current | window | rewrite (default: TABot's)"
+        "--query-mode", type=str, default=None, help="current | window | rrf | rewrite (default: TABot's)"
+    )
+    parser.add_argument(
+        "--abstract-weight", type=float, default=None, help="weight of title+abstract ranking (0 disables)"
     )
     parser.add_argument("--skip-memory", action="store_true", help="Run retrieval only")
     args = parser.parse_args()
@@ -196,6 +199,8 @@ def main():
     }
     if args.query_mode:
         config["query_mode"] = args.query_mode
+    if args.abstract_weight is not None:
+        config["abstract_weight"] = args.abstract_weight
 
     # Import and instantiate
     try:
@@ -239,7 +244,7 @@ def main():
     # Summary
     print()
     print("=" * 60)
-    print(f"SUMMARY (my_eval — query_mode={bot.query_mode})")
+    print(f"SUMMARY (my_eval — query_mode={bot.query_mode}, abstract_weight={bot.abstract_weight})")
     print("-" * 60)
     print(f"  Single-turn hit-rate:  {st_hr:.1%}  ({len(st_data)} questions)")
     for style, hr in sorted(st_by_style.items()):
