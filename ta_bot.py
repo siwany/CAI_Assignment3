@@ -161,7 +161,7 @@ class TABot:
     REWRITE_TURNS = 2      ## number of past (user, assistant) exchanges shown to the rewriter
     REWRITE_ANSWER_CHARS = 300  ## max characters of each past assistant answer shown to the rewriter
     REWRITE_MAX_CHARS = 300     ## rewrites longer than this are treated as failed
-    TOP_K = 5        ## number of papers returned as citations
+    TOP_K = 5        ## number of papers returned as citations; override via config["top_k"] or TA_TOP_K
     HISTORY_TURNS = 4      ## number of past (user, assistant) exchanges sent to the LLM
     SNIPPET_CHARS = 1200   ## max characters of each retrieved chunk put in the prompt
 
@@ -194,6 +194,7 @@ class TABot:
         if self.query_mode not in self.QUERY_MODES:
             raise ValueError(f"query_mode must be one of {self.QUERY_MODES}, got {self.query_mode!r}")
         self.abstract_weight = float(config.get("abstract_weight", self.ABSTRACT_WEIGHT))
+        self.top_k = int(config.get("top_k") or os.environ.get("TA_TOP_K") or self.TOP_K)
         self.last_query = ""  ## most recent retrieval query, kept for ablation logging
 
         ## retreival pipeline: connect to corpus database
@@ -260,7 +261,7 @@ class TABot:
         # TODO: implement retrieval, generation, and memory update
         queries = self._build_query(session_id, message)
         self.last_query = " || ".join(q for q, _ in queries)
-        hits = self._search_fused(queries, k=self.TOP_K)
+        hits = self._search_fused(queries, k=self.top_k)
         citations = [pid for pid, _ in hits]
 
         ## records this user turn for future queries within same sessions
