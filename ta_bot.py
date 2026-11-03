@@ -41,15 +41,41 @@ REFUSE_PATTERNS = [
 ]
 ALLOW_PATTERNS = [
     r"\bi(?:[’']m| am) (a|an)\b.*\b(phd|master'?s?|ms|undergrad\w*|ta|student|researcher)\b",
-    r"\bi(?:[’']m| am) (taking|enrolled in|focusing on)\b",
+    r"\bi(?:[’']m| am) (taking|enrolled in|focusing on|studying|researching|majoring in)\b",
     r"\bi(?:[’']m| am) (writing|working on|doing) (my|a|an|the)\b",   # project/assignment statements
-    r"\bmy (project|thesis|research|dissertation|advisor)\b",
+    r"\bmy (\w+ )?(project|thesis|research|dissertation|advisor|major|capstone)\b",
     r"\bi (work|research|study|focus) on\b",
+    r"\bi (study|research|major in)\b",
     r"\b(my name is|call me|i go by)\b",
     r"\bi(?:[’']m| am) (most |really |especially )?interested in\b",
-    r"\bi prefer\b",
-    r"\bplease (always|keep|use|explain|cite)\b",
+    r"\bi(?:[’']d| would)? ?prefer\b",
+    r"\bi (really |especially |mostly )?(like|love|enjoy)\b",
+    r"\bmy (favou?rite|preferred)\b",
+    r"\bplease (always|keep|use|explain|cite|format)\b",
 ]
+
+## "I'm Priya" style introductions; checked on the original casing so "i'm tired" doesn't match
+NAME_PATTERN = r"\b(?:I[’']m|I am)\s+([A-Z][a-z]+)\b"
+NOT_NAMES = {
+    "Not", "So", "Just", "Also", "Really", "Still", "Here", "Back", "Sorry", "Glad", "Happy",
+    "Fine", "Good", "Done", "Currently", "Now", "Very", "Pretty", "Trying", "Looking", "Working",
+    "Taking", "Writing", "Doing", "Interested", "Most", "Curious", "Confused", "Wondering", "New",
+}
+
+## explicit "don't remember this": nothing from that message is stored
+OPT_OUT_PATTERN = (
+    r"\b(don[’']?t|do not|never|no need to) (remember|store|save|keep|record|memori[sz]e|note)\b"
+    r"|\boff the record\b|\bbetween (you and me|us)\b"
+)
+## explicit "forget ...": must be aimed at what the user said, so "how do LLMs forget X" is not a request
+FORGET_PATTERN = (
+    r"\b(forget|delete|erase|remove)\b\s+(?:that\s+|what\s+)?"
+    r"(?:i\s+(?:said|told you|mentioned)|my\b|about me|everything|all\b|it\b|that\b)"
+)
+FORGET_STOPWORDS = {
+    "forget", "delete", "erase", "remove", "please", "actually", "that", "what", "said", "told",
+    "you", "mentioned", "my", "about", "me", "it", "the", "and", "was", "is", "are", "am", "i",
+}
 
 def _should_store(text: str) -> bool:
     """
@@ -58,14 +84,36 @@ def _should_store(text: str) -> bool:
     lowered = text.lower()
     if any(re.search(p, lowered) for p in REFUSE_PATTERNS):
         return False
-    return any(re.search(p, lowered) for p in ALLOW_PATTERNS)
+    if any(re.search(p, lowered) for p in ALLOW_PATTERNS):
+        return True
+    m = re.search(NAME_PATTERN, text)
+    return bool(m) and m.group(1) not in NOT_NAMES
 
 def _extract_facts(text: str) -> list[str]:
     """
     split message into sentences and keep only the ones that pass _should_store
+    a message that asks not to be remembered, or asks to forget something, stores nothing
     """
+    lowered = text.lower()
+    if re.search(OPT_OUT_PATTERN, lowered) or re.search(FORGET_PATTERN, lowered):
+        return []
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     return [s for s in sentences if _should_store(s)]
+
+def _apply_forget(text: str, facts: list[str]) -> list[str]:
+    """
+    handles "forget my name" / "forget that I said ..." / "forget everything"
+    returns the facts that survive: those sharing a content word with the forget request are dropped
+    """
+    lowered = text.lower()
+    m = re.search(FORGET_PATTERN, lowered)
+    if not m:
+        return facts
+    tail = lowered[m.start():]
+    targets = {w for w in re.findall(r"[a-z0-9]+", tail) if len(w) > 2 and w not in FORGET_STOPWORDS}
+    if not targets or targets & {"everything", "all"}:
+        return []
+    return [f for f in facts if not targets & set(re.findall(r"[a-z0-9]+", f.lower()))]
 
 
 class TABot:
@@ -172,7 +220,7 @@ class TABot:
         self.sessions.setdefault(session_id, []).append(message)
 
         ## memory filter
-        facts = self.memory.setdefault(user_id, [])
+        facts = self.memory[user_id] = _apply_forget(message, self.memory.get(user_id, []))
         for fact in _extract_facts(message):
             if fact not in facts:
                 facts.append(fact)
