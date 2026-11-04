@@ -22,14 +22,37 @@ SYSTEM_PROMPT = (
 )
 
 REWRITE_PROMPT = (
-    "You rewrite a student's latest question into a standalone search query for a keyword "
-    "(BM25) search over research papers on conversational AI and language models. "
-    "If there is earlier conversation, use it only to resolve pronouns and references like "
-    "'it', 'that approach', or 'these methods' into the concrete method, model, or paper names; "
-    "if the student switches topics, ignore the earlier topic. "
-    "When the student describes something in everyday words, add the technical terms and "
-    "method names a research paper would use for it. "
-    "Output only the query on one line: technical keywords and names, no explanation."
+    "You rewrite a student's latest question into a standalone keyword search query over "
+    "research papers on conversational AI and language models.\n"
+    "Rules:\n"
+    "1. The query is about the LATEST question. Use earlier conversation only to replace "
+    "references like 'it', 'that approach', or 'these methods' with the concrete method, model, "
+    "or paper names they refer to. If the latest question is about something new, ignore the "
+    "earlier conversation completely.\n"
+    "2. If the student describes something in everyday words, add the standard technical terms "
+    "a research paper would use for it. Only add terms you are confident are correct; never "
+    "guess unrelated fields.\n"
+    "3. Output 5 to 15 plain keywords on one line. No sentences, no labels like 'Query:', no "
+    "quotes, no parentheses, no AND/OR.\n"
+    "\n"
+    "Examples:\n"
+    "Conversation: User: How do gated recurrent units compare to LSTMs?\n"
+    "Latest question: Why are they easier to train than plain RNNs?\n"
+    "Query: GRU LSTM gating vanishing exploding gradient recurrent neural network training\n"
+    "\n"
+    "Conversation: User: What is slot filling in task-oriented dialogue?\n"
+    "Latest question: How do speech models learn from raw audio without transcripts?\n"
+    "Query: self-supervised speech representation learning raw audio unlabeled pre-training\n"
+    "\n"
+    "Latest question: How do computers turn words into numbers that capture their meaning?\n"
+    "Query: word embeddings distributed word representations vector space word2vec"
+)
+
+## the student explicitly changes subject: the rewriter is not shown earlier turns at all
+TOPIC_SWITCH_PATTERN = (
+    r"\b(switch(ing)? (gears|topics?)|change of topic|on another note|moving on|unrelated(ly)?)\b"
+    ## "new topic" etc. only as a lead-in ("Different question: ..."), not inside a question about topics
+    r"|\b(different|new|unrelated|separate|another) (topic|question|subject)\s*[:,.!—-]"
 )
 
 ## common English function words plus conversational filler ("tell me about", "explain")
@@ -511,8 +534,12 @@ class TABot:
         the original message is kept so a bad rewrite can only add terms, never drop them
         falls back to the current message alone if the rewrite is empty or too long,
         so rewrite on/off differs only in the rewrite itself
+        an explicit topic switch ("switching gears", "different question") hides earlier turns
+        from the rewriter, since a small model tends to carry the old topic over
         """
         history = self.history.get(session_id, [])[-2 * self.REWRITE_TURNS:]
+        if re.search(TOPIC_SWITCH_PATTERN, message.lower()):
+            history = []
 
         lines = []
         for m in history:
@@ -521,15 +548,17 @@ class TABot:
                 content = content[:self.REWRITE_ANSWER_CHARS]
             lines.append(f"{m['role'].capitalize()}: {content}")
         context = ("Conversation so far:\n" + "\n".join(lines) + "\n\n") if lines else ""
-        prompt = f"{context}Latest question: {message}\n\nStandalone search query:"
+        prompt = f"{context}Latest question: {message}\nQuery:"
         rewrite = self._generate(
             [{"role": "system", "content": REWRITE_PROMPT}, {"role": "user", "content": prompt}],
             max_tokens=64,
         )
 
-        ## keep first non-empty line, strip quotes and labels like "Query:"
+        ## keep first non-empty line; strip labels ("BM25 search query:"), boolean syntax and quotes
         rewrite = next((l for l in rewrite.splitlines() if l.strip()), "").strip()
-        rewrite = re.sub(r"^(standalone )?(search )?query\s*:\s*", "", rewrite, flags=re.I).strip(" \"'")
+        rewrite = re.sub(r"^[\w\s-]{0,30}?\b(query|keywords)\s*:\s*", "", rewrite, flags=re.I)
+        rewrite = re.sub(r"\bbm25\b|\b(AND|OR|NOT)\b|[()\"'`*]", " ", rewrite)
+        rewrite = re.sub(r"\s+", " ", rewrite).strip()
         if not rewrite or len(rewrite) > self.REWRITE_MAX_CHARS:
             return message
         return f"{message} {rewrite}"

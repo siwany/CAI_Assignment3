@@ -1,0 +1,92 @@
+W1104 16:06:38.476000 18329 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/redirects.py:35] NOTE: Redirects are currently not supported in MacOs.
+Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]Loading weights: 100%|██████████| 199/199 [00:00<00:00, 5113.97it/s]
+============================================================
+PREFLIGHT — structural checks
+------------------------------------------------------------
+  chat() shape:    ✓  {answer: str, citations: list}
+  reset_memory():  ✓
+  get_memory():    ✓  list[str] (0 items)
+  All preflight checks passed.
+
+============================================================
+SINGLE-TURN RETRIEVAL
+------------------------------------------------------------
+  my-st-01 [synonym]: ✓  cited=['L01-01', 'L03-05', 'L03-01', 'L06-04', 'L03-09']  gold=['L01-01']
+  my-st-02 [synonym]: ✓  cited=['L01-02', 'L12-01', 'L01-04', 'L12-03', 'L01-03']  gold=['L01-02']
+  my-st-03 [synonym]: ✓  cited=['L01-03', 'L17-01', 'L13-06', 'L13-09', 'L14-06']  gold=['L01-03']
+  my-st-04 [synonym]: ✓  cited=['L06-03', 'L02-01', 'L01-01', 'L03-01', 'L08-01']  gold=['L02-01']
+  my-st-05 [synonym]: ✓  cited=['L02-05', 'L03-07', 'L06-01', 'L09-02', 'L05-02']  gold=['L02-05']
+  my-st-06 [synonym]: ✓  cited=['L03-01', 'L03-09', 'L03-03', 'L12-05', 'L01-01']  gold=['L03-01']
+  my-st-07 [synonym]: ✓  cited=['L03-02', 'L06-02', 'L03-07', 'L03-09', 'L06-01']  gold=['L03-02']
+  my-st-08 [synonym]: ✓  cited=['L06-01', 'L02-02', 'L02-05', 'L14-03', 'L02-01']  gold=['L06-01']
+  my-st-09 [synonym]: ✓  cited=['L06-02', 'L03-03', 'L03-09', 'L03-02', 'L06-03']  gold=['L06-02']
+  my-st-10 [vague]: ✓  cited=['L07-03', 'L08-01', 'L24-01', 'L13-02', 'L07-02']  gold=['L07-03']
+  my-st-11 [vague]: ✓  cited=['L07-04', 'L14-08', 'L01-02', 'L12-05', 'L20-01']  gold=['L07-04']
+  my-st-12 [synonym]: ✓  cited=['L07-02', 'L05-01', 'L08-02', 'L08-01', 'L07-03']  gold=['L05-01']
+  my-st-13 [synonym]: ✓  cited=['L05-02', 'L02-04', 'L02-05', 'L07-02', 'L06-01']  gold=['L05-02']
+  my-st-14 [synonym]: ✓  cited=['L08-03', 'L08-02', 'L05-02', 'L08-01', 'L06-01']  gold=['L08-03']
+  my-st-15 [synonym]: ✓  cited=['L13-02', 'L04-05', 'L09-01', 'L09-02', 'L08-04']  gold=['L09-01']
+  my-st-16 [vague]: ✓  cited=['L14-05', 'L09-04', 'L09-07', 'L10-10', 'L13-02']  gold=['L09-07']
+  my-st-17 [synonym]: ✓  cited=['L10-03', 'L10-04', 'L10-01', 'L10-10', 'L16-05']  gold=['L10-03']
+  my-st-18 [synonym]: ✓  cited=['L10-04', 'L10-10', 'L10-06', 'L10-01', 'L16-05']  gold=['L10-04']
+  my-st-19 [synonym]: ✓  cited=['L10-10', 'L16-05', 'L10-04', 'L10-03', 'L10-05']  gold=['L10-10']
+  my-st-20 [synonym]: ✓  cited=['L11-01', 'L11-02', 'L09-02', 'L23-02', 'L10-06']  gold=['L11-01']
+  my-st-21 [synonym]: ✓  cited=['L12-03', 'L12-04', 'L01-01', 'L03-05', 'L01-03']  gold=['L12-03']
+  my-st-22 [synonym]: ✓  cited=['L12-05', 'L07-04', 'L03-09', 'L12-08', 'L01-01']  gold=['L12-05']
+  my-st-23 [synonym]: ✓  cited=['L13-03', 'L04-04', 'L03-09', 'L13-13', 'L13-07']  gold=['L13-03']
+  my-st-24 [synonym]: ✓  cited=['L13-04', 'L13-07', 'L13-03', 'L13-02', 'L04-03']  gold=['L13-04']
+  my-st-25 [synonym]: ✓  cited=['L13-12', 'L13-06', 'L16-05', 'L02-05', 'L10-01']  gold=['L13-12']
+  my-st-26 [synonym]: ✓  cited=['L14-01', 'L14-06', 'L11-03', 'L13-02', 'L11-06']  gold=['L14-01']
+  my-st-27 [synonym]: ✓  cited=['L14-05', 'L04-01', 'L04-05', 'L04-04', 'L04-03']  gold=['L14-05']
+  my-st-28 [vague]: ✓  cited=['L14-08', 'L14-03', 'L14-06', 'L14-01', 'L01-04']  gold=['L14-08']
+  my-st-29 [synonym]: ✓  cited=['L15-04', 'L24-01', 'L09-02', 'L15-03', 'L09-03']  gold=['L15-04']
+  my-st-30 [vague]: ✓  cited=['L16-04', 'L16-06', 'L16-05', 'L09-04', 'L11-06']  gold=['L16-04']
+  my-st-31 [vague]: ✓  cited=['L16-03', 'L16-07', 'L16-01', 'L16-05', 'L16-06']  gold=['L16-01']
+  my-st-32 [synonym]: ✓  cited=['L17-03', 'L14-02', 'L17-07', 'L17-13', 'L17-08']  gold=['L17-03']
+  my-st-33 [synonym]: ✓  cited=['L17-07', 'L17-03', 'L12-08', 'L17-05', 'L14-01']  gold=['L17-07']
+  my-st-34 [synonym]: ✓  cited=['L17-08', 'L12-05', 'L16-05', 'L14-02', 'L17-07']  gold=['L17-08']
+  my-st-35 [synonym]: ✓  cited=['L17-10', 'L17-04', 'L16-05', 'L16-08', 'L17-03']  gold=['L17-10']
+  my-st-36 [synonym]: ✓  cited=['L17-01', 'L15-02', 'L13-06', 'L16-08', 'L16-05']  gold=['L17-01']
+  my-st-37 [vague]: ✗  cited=['L13-08', 'L04-04', 'L13-04', 'L13-01', 'L13-13']  gold=['L13-02']
+  my-st-38 [vague]: ✗  cited=['L05-01', 'L13-06', 'L07-04', 'L07-01', 'L04-01']  gold=['L08-06']
+  my-st-39 [vague]: ✓  cited=['L11-03', 'L11-02', 'L15-04', 'L14-01', 'L11-01']  gold=['L11-03']
+  my-st-40 [vague]: ✓  cited=['L09-04', 'L09-03', 'L16-04', 'L09-08', 'L09-07']  gold=['L09-04']
+  my-st-41 [synonym]: ✓  cited=['L04-04', 'L13-13', 'L13-04', 'L13-02', 'L13-07']  gold=['L04-04']
+  my-st-42 [vague]: ✓  cited=['L12-06', 'L10-07', 'L10-01', 'L10-05', 'L12-01']  gold=['L12-06']
+  my-st-43 [vague]: ✓  cited=['L10-07', 'L03-05', 'L14-03', 'L12-04', 'L14-06']  gold=['L10-07']
+  my-st-44 [vague]: ✓  cited=['L15-02', 'L24-01', 'L08-04', 'L09-01', 'L13-01']  gold=['L15-02']
+  my-st-45 [vague]: ✓  cited=['L16-03', 'L16-01', 'L16-04', 'L16-05', 'L16-07']  gold=['L16-03']
+  my-st-46 [vague]: ✓  cited=['L13-06', 'L13-07', 'L13-08', 'L13-03', 'L13-01']  gold=['L13-06']
+  my-st-47 [vague]: ✓  cited=['L14-02', 'L17-13', 'L16-07', 'L17-01', 'L17-07']  gold=['L14-02']
+  my-st-48 [vague]: ✓  cited=['L19-01', 'L18-01', 'L20-01', 'L09-07', 'L09-02']  gold=['L19-01']
+  my-st-49 [vague]: ✓  cited=['L21-01', 'L03-05', 'L03-01', 'L03-09', 'L01-04']  gold=['L21-01']
+  my-st-50 [vague]: ✓  cited=['L23-02', 'L09-07', 'L07-04', 'L01-01', 'L03-05']  gold=['L23-02']
+  my-st-51 [vague]: ✓  cited=['L11-06', 'L11-01', 'L09-02', 'L11-02', 'L10-10']  gold=['L11-02']
+  my-st-52 [vague]: ✓  cited=['L11-06', 'L16-06', 'L08-07', 'L15-01', 'L24-01']  gold=['L08-07']
+  my-st-53 [vague]: ✓  cited=['L10-05', 'L10-01', 'L10-07', 'L09-07', 'L16-08']  gold=['L10-05']
+  my-st-54 [vague]: ✓  cited=['L16-05', 'L16-03', 'L16-08', 'L17-10', 'L10-10']  gold=['L16-05']
+  my-st-55 [vague]: ✗  cited=['L16-05', 'L16-01', 'L10-07', 'L16-03', 'L17-01']  gold=['L16-08']
+  my-st-56 [vague]: ✓  cited=['L17-13', 'L12-08', 'L17-05', 'L16-04', 'L12-05']  gold=['L17-13']
+  my-st-57 [vague]: ✓  cited=['L22-03', 'L17-03', 'L17-05', 'L12-04', 'L14-02']  gold=['L22-03']
+  my-st-58 [vague]: ✓  cited=['L24-01', 'L08-01', 'L08-04', 'L09-01', 'L15-02']  gold=['L24-01']
+  my-st-59 [vague]: ✓  cited=['L20-01', 'L21-01', 'L18-01', 'L19-01', 'L05-04']  gold=['L20-01']
+  my-st-60 [vague]: ✓  cited=['L18-01', 'L19-01', 'L21-01', 'L09-07', 'L20-01']  gold=['L18-01']
+  my-st-61 [vague]: ✓  cited=['L13-04', 'L13-07', 'L13-12', 'L09-01', 'L13-03']  gold=['L13-07']
+  my-st-62 [vague]: ✓  cited=['L12-08', 'L12-05', 'L14-02', 'L03-05', 'L17-03']  gold=['L12-08']
+  my-st-63 [vague]: ✓  cited=['L03-09', 'L03-03', 'L02-03', 'L17-02', 'L12-08']  gold=['L03-09']
+  my-st-64 [vague]: ✓  cited=['L03-03', 'L06-03', 'L01-01', 'L12-05', 'L03-01']  gold=['L06-03']
+  my-st-65 [multi-paper]: ✓  cited=['L13-04', 'L04-04', 'L13-03', 'L14-08', 'L13-01']  gold=['L04-04', 'L13-04']
+  my-st-66 [multi-paper]: partial (50%)  cited=['L10-04', 'L10-10', 'L10-05', 'L10-06', 'L16-05']  gold=['L10-01', 'L10-04']
+  my-st-67 [multi-paper]: ✓  cited=['L11-02', 'L11-06', 'L11-01', 'L20-01', 'L08-05']  gold=['L11-01', 'L11-02']
+  my-st-68 [multi-paper]: ✓  cited=['L09-03', 'L09-04', 'L24-01', 'L16-04', 'L09-02']  gold=['L09-03', 'L09-04']
+  my-st-69 [multi-paper]: ✓  cited=['L14-06', 'L08-01', 'L14-01', 'L08-05', 'L07-01']  gold=['L14-01', 'L14-06']
+  my-st-70 [multi-paper]: partial (50%)  cited=['L07-01', 'L05-04', 'L07-03', 'L05-01', 'L08-02']  gold=['L07-01', 'L07-02']
+
+============================================================
+MULTI-TURN RETRIEVAL
+------------------------------------------------------------
+  my-mt-01 [pronoun-follow-up]: ✓  turns=✓✓✓  cited=['L11-02', 'L11-03', 'L11-06', 'L14-01', 'L11-01']  gold=['L11-03']
+  my-mt-02 [pronoun-follow-up]: ✓  turns=✓✓✓  cited=['L16-07', 'L16-02', 'L16-01', 'L16-05', 'L17-01']  gold=['L16-07']
+  my-mt-03 [topic-switch]: ✓  turns=✓✓✓  cited=['L19-01', 'L02-03', 'L20-01', 'L18-01', 'L21-01']  gold=['L19-01']
+  my-mt-04 [follow-up-drill-down]: ✓  turns=✓✓✓  cited=['L10-04', 'L10-01', 'L16-03', 'L10-05', 'L10-03']  gold=['L10-05']/Users/siwanyang/.local/share/uv/python/cpython-3.12.14-macos-aarch64-none/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '

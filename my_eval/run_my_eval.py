@@ -175,6 +175,7 @@ def main():
         "--abstract-weight", type=float, default=None, help="weight of title+abstract ranking (0 disables)"
     )
     parser.add_argument("--top-k", type=int, default=None, help="number of cited papers (default: TABot's)")
+    parser.add_argument("--max-tokens", type=int, default=None, help="answer length limit (default: TABot's)")
     parser.add_argument("--skip-memory", action="store_true", help="Run retrieval only")
     args = parser.parse_args()
 
@@ -204,6 +205,8 @@ def main():
         config["abstract_weight"] = args.abstract_weight
     if args.top_k is not None:
         config["top_k"] = args.top_k
+    if args.max_tokens is not None:
+        config["max_tokens"] = args.max_tokens
 
     # Import and instantiate
     try:
