@@ -169,10 +169,7 @@ def main():
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
-        "--query-mode", type=str, default=None, help="current | window | rrf | rewrite (default: TABot's)"
-    )
-    parser.add_argument(
-        "--abstract-weight", type=float, default=None, help="weight of title+abstract ranking (0 disables)"
+        "--query-mode", type=str, default=None, help="current | rrf | rewrite (default: TABot's)"
     )
     parser.add_argument("--top-k", type=int, default=None, help="number of cited papers (default: TABot's)")
     parser.add_argument("--max-tokens", type=int, default=None, help="answer length limit (default: TABot's)")
@@ -201,8 +198,6 @@ def main():
     }
     if args.query_mode:
         config["query_mode"] = args.query_mode
-    if args.abstract_weight is not None:
-        config["abstract_weight"] = args.abstract_weight
     if args.top_k is not None:
         config["top_k"] = args.top_k
     if args.max_tokens is not None:
@@ -250,8 +245,7 @@ def main():
     # Summary
     print()
     print("=" * 60)
-    print(f"SUMMARY (my_eval — query_mode={bot.query_mode}, top_k={bot.top_k}, "
-          f"abstract_weight={bot.abstract_weight})")
+    print(f"SUMMARY (my_eval — query_mode={bot.query_mode}, top_k={bot.top_k})")
     print("-" * 60)
     print(f"  Single-turn hit-rate:  {st_hr:.1%}  ({len(st_data)} questions)")
     for style, hr in sorted(st_by_style.items()):

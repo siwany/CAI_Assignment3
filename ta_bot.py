@@ -174,12 +174,11 @@ class TABot:
     """Course TA-Bot with RAG retrieval and cross-session memory."""
 
     STOPWORDS = STOPWORDS
-    QUERY_MODES = ("current", "window", "rrf", "rewrite")
+    QUERY_MODES = ("current", "rrf", "rewrite")
     QUERY_MODE = "rrf"  ## default retrieval query mode; override via config["query_mode"] or TA_QUERY_MODE env var
     QUERY_WINDOW = 3 ## number of recent user turns used for retreival (ablate later)
     RRF_K = 60             ## reciprocal rank fusion constant (standard value)
     RRF_CURRENT_WEIGHT = 1.0    ## rrf mode: weight of the current-message ranking vs the window ranking (1.0)
-    ABSTRACT_WEIGHT = 0.0  ## weight of the title+abstract ranking vs the chunk ranking (1.0); 0 disables it
     CANDIDATES = 20        ## papers taken from each ranking before fusion
     REWRITE_TURNS = 2      ## number of past (user, assistant) exchanges shown to the rewriter
     REWRITE_ANSWER_CHARS = 300  ## max characters of each past assistant answer shown to the rewriter
@@ -212,28 +211,16 @@ class TABot:
         self.timeout = config.get("timeout", 60)        ## seconds per LLM request
         self.max_tokens = config.get("max_tokens", 512)
 
-        ## retrieval query mode (ablation axis): current message only / window concat / rrf fusion / LLM rewrite
+        ## retrieval query mode (ablation axis): current message only (BM25 baseline) / rrf fusion / LLM rewrite
         self.query_mode = config.get("query_mode") or os.environ.get("TA_QUERY_MODE") or self.QUERY_MODE
         if self.query_mode not in self.QUERY_MODES:
             raise ValueError(f"query_mode must be one of {self.QUERY_MODES}, got {self.query_mode!r}")
-        self.abstract_weight = float(config.get("abstract_weight", self.ABSTRACT_WEIGHT))
         self.top_k = int(config.get("top_k") or os.environ.get("TA_TOP_K") or self.TOP_K)
         self.last_query = ""  ## most recent retrieval query, kept for ablation logging
 
         ## retreival pipeline: connect to corpus database
         db_path = os.path.join(config["corpus_path"], "corpus.db")
         self.db = sqlite3.connect(db_path, check_same_thread=False)
-
-        ## paper-level index over title + abstract, built in memory so corpus.db is never modified
-        self.abs_db = sqlite3.connect(":memory:", check_same_thread=False)
-        self.abs_db.execute(
-            "CREATE VIRTUAL TABLE papers_fts USING fts5(paper_id UNINDEXED, title, abstract, "
-            "tokenize='porter unicode61')"
-        )
-        self.abs_db.executemany(
-            "INSERT INTO papers_fts VALUES (?, ?, ?)",
-            self.db.execute("SELECT paper_id, title, coalesce(abstract, '') FROM papers").fetchall(),
-        )
 
         ## memory store: user_id --> list of fact strings
         self.memory: dict[str, list[str]] = {}
@@ -355,26 +342,12 @@ class TABot:
     
 
     ### HELPER METHODS
-    def _retrieve(self, query: str, k: int = 5) -> list[str]:
-        """
-        text query input
-        returns up to k unique paper_ids that best match
-        """
-        return [pid for pid, _ in self._search(query, k)]
-
-    def _search(self, query: str, k: int = 5) -> list[tuple[str, str]]:
-        """
-        single-query search (chunks + abstracts fused)
-        returns up to k (paper_id, chunk_id) pairs
-        """
-        return self._search_fused([(query, 1.0)], k)
-
     def _search_fused(self, queries: list[tuple[str, float]], k: int = 5) -> list[tuple[str, str]]:
         """
         weighted reciprocal rank fusion over every (query, weight):
-          each query contributes a chunk-level BM25 paper ranking and a title+abstract BM25 paper ranking
+          each query contributes a chunk-level BM25 paper ranking
         returns up to k (paper_id, chunk_id) pairs: unique papers, each with its best chunk
-        with one query and abstract_weight=0 this reduces to plain chunk BM25 order
+        with one query this reduces to plain chunk BM25 order
         """
         scores: dict[str, float] = {}
         best_chunk: dict[str, str] = {}
@@ -385,12 +358,9 @@ class TABot:
             for rank, (pid, cid) in enumerate(self._chunk_ranking(match, self.CANDIDATES)):
                 scores[pid] = scores.get(pid, 0.0) + weight / (self.RRF_K + rank + 1)
                 best_chunk.setdefault(pid, cid)  ## first (highest-weight) query picks the excerpt
-            if self.abstract_weight > 0:
-                for rank, pid in enumerate(self._abstract_ranking(match, self.CANDIDATES)):
-                    scores[pid] = scores.get(pid, 0.0) + weight * self.abstract_weight / (self.RRF_K + rank + 1)
 
         ranked = sorted(scores, key=lambda p: -scores[p])[:k]  ## stable sort: ties keep insertion order
-        return [(pid, best_chunk.get(pid) or self._best_chunk(pid, queries[0][0])) for pid in ranked]
+        return [(pid, best_chunk[pid]) for pid in ranked]
 
     def _match_expr(self, query: str) -> str:
         """
@@ -416,35 +386,6 @@ class TABot:
                 if len(hits) == n:
                     break
         return hits
-
-    def _abstract_ranking(self, match: str, n: int) -> list[str]:
-        """
-        BM25 over paper titles + abstracts; up to n paper_ids
-        """
-        rows = self.abs_db.execute(
-            "SELECT paper_id FROM papers_fts WHERE papers_fts MATCH ? ORDER BY bm25(papers_fts) LIMIT ?",
-            (match, n),
-        ).fetchall()
-        return [pid for (pid,) in rows]
-
-    def _best_chunk(self, paper_id: str, query: str) -> str:
-        """
-        best-matching chunk inside one paper (for papers found only through their abstract);
-        falls back to the paper's first chunk
-        """
-        match = self._match_expr(query)
-        row = None
-        if match:
-            row = self.db.execute(
-                "SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? AND paper_id = ? "
-                "ORDER BY bm25(chunks_fts) LIMIT 1",
-                (match, paper_id),
-            ).fetchone()
-        if row is None:
-            row = self.db.execute(
-                "SELECT chunk_id FROM chunks WHERE paper_id = ? ORDER BY chunk_index LIMIT 1", (paper_id,)
-            ).fetchone()
-        return row[0] if row else ""
 
     def _build_messages(self, session_id: str, user_id: str, message: str,
                         hits: list[tuple[str, str]]) -> list[dict]:
@@ -502,8 +443,7 @@ class TABot:
     def _build_query(self, session_id: str, message: str) -> list[tuple[str, float]]:
         """
         builds the weighted retrieval queries according to self.query_mode:
-          current: current message only
-          window : current message plus last few user turns from same session, as one query
+          current: current message only (plain BM25 baseline)
           rrf    : current message (weight RRF_CURRENT_WEIGHT) fused with the window query (weight 1),
                    so earlier turns help resolve references without drowning a topic switch
           rewrite: current message plus an LLM rewrite (resolves references, adds technical terms)
@@ -513,9 +453,9 @@ class TABot:
         if self.query_mode == "rewrite":
             return [(self._rewrite_query(session_id, message), 1.0)]
         window = self._window_query(session_id, message)
-        if self.query_mode == "rrf" and window != message:
-            return [(message, self.RRF_CURRENT_WEIGHT), (window, 1.0)]
-        return [(window, 1.0)]
+        if window == message:  ## first turn of a session: nothing to fuse
+            return [(message, 1.0)]
+        return [(message, self.RRF_CURRENT_WEIGHT), (window, 1.0)]
 
     def _window_query(self, session_id: str, message: str) -> str:
         """
