@@ -55,6 +55,18 @@ TOPIC_SWITCH_PATTERN = (
     r"|\b(different|new|unrelated|separate|another) (topic|question|subject)\s*[:,.!—-]"
 )
 
+## the student asks to recap or compare what was already discussed ("all three ... we discussed"):
+## only then do papers cited earlier in the session join the rrf fusion
+## every alternative points back at the conversation; bare "summarize" or "the two" are left out
+## because "summarize this paper" or "the two objectives of BERT" ask about something new
+RECAP_PATTERN = (
+    r"\bwe(?:[’']ve| have)? (discussed|talked about|covered|went over|mentioned|looked at)\b"
+    r"|\b(discussed|mentioned|covered) (so far|earlier|above|before|previously)\b"
+    r"|\b(all|both) (two|three|four|five)\b|\b(all|both) of (them|these|those)\b"
+    r"|\b(those|these) (two|three|four|five) (approaches|methods|papers|models|strategies|techniques|systems)\b"
+    r"|\bcompare (them|these|those)\b|\b(so far|up to now) in (this|our) (conversation|chat|discussion)\b"
+)
+
 ## common English function words plus conversational filler ("tell me about", "explain")
 STOPWORDS = set("""
 a about above after again against all am an and any are as at be because been before being below
@@ -211,6 +223,10 @@ class TABot:
     QUERY_WINDOW = 3 ## number of recent user turns used for retreival (ablate later)
     RRF_K = 60             ## reciprocal rank fusion constant (standard value)
     RRF_CURRENT_WEIGHT = 1.0    ## rrf mode: weight of the current-message ranking vs the window ranking (1.0)
+    CITED_WEIGHT = 1.0     ## rrf mode: weight of the ranking of papers cited earlier in the session (recap
+                           ## questions only); 0 disables it
+    CITED_TURNS = 3        ## rrf mode: number of previous turns whose citations form that ranking
+    CITED_PER_TURN = 2     ## rrf mode: only each turn's top papers count, so a poorly ranked miss is not re-boosted
     CANDIDATES = 20        ## papers taken from each ranking before fusion
     REWRITE_TURNS = 2      ## number of past (user, assistant) exchanges shown to the rewriter
     REWRITE_ANSWER_CHARS = 300  ## max characters of each past assistant answer shown to the rewriter
@@ -263,6 +279,9 @@ class TABot:
         ## dialogue history: session_id --> list of {"role", "content"} messages (sent to the LLM)
         self.history: dict[str, list[dict]] = {}
 
+        ## citations per turn: session_id --> list of [(paper_id, chunk_id), ...] (rrf cited-paper ranking)
+        self.cited: dict[str, list[list[tuple[str, str]]]] = {}
+
     def chat(
         self,
         session_id: str,
@@ -303,11 +322,13 @@ class TABot:
         # TODO: implement retrieval, generation, and memory update
         queries = self._build_query(session_id, message)
         self.last_query = " || ".join(q for q, _ in queries)
-        hits = self._search_fused(queries, k=self.top_k)
+        cited = self._cited_ranking(session_id, message) if self.query_mode == "rrf" else []
+        hits = self._search_fused(queries, k=self.top_k, cited=cited)
         citations = [pid for pid, _ in hits]
 
-        ## records this user turn for future queries within same sessions
+        ## records this user turn (and what it cited) for future queries within same sessions
         self.sessions.setdefault(session_id, []).append(message)
+        self.cited.setdefault(session_id, []).append(hits)
 
         ## memory filter
         facts = self.memory[user_id] = _apply_forget(message, self.memory.get(user_id, []))
@@ -374,12 +395,14 @@ class TABot:
     
 
     ### HELPER METHODS
-    def _search_fused(self, queries: list[tuple[str, float]], k: int = 5) -> list[tuple[str, str]]:
+    def _search_fused(self, queries: list[tuple[str, float]], k: int = 5,
+                      cited: list[tuple[str, str]] = ()) -> list[tuple[str, str]]:
         """
         weighted reciprocal rank fusion over every (query, weight):
           each query contributes a chunk-level BM25 paper ranking
+          cited (rrf mode) adds the papers cited earlier in the session as one more ranking (CITED_WEIGHT)
         returns up to k (paper_id, chunk_id) pairs: unique papers, each with its best chunk
-        with one query this reduces to plain chunk BM25 order
+        with one query and no cited ranking this reduces to plain chunk BM25 order
         """
         scores: dict[str, float] = {}
         best_chunk: dict[str, str] = {}
@@ -390,6 +413,9 @@ class TABot:
             for rank, (pid, cid) in enumerate(self._chunk_ranking(match, self.CANDIDATES)):
                 scores[pid] = scores.get(pid, 0.0) + weight / (self.RRF_K + rank + 1)
                 best_chunk.setdefault(pid, cid)  ## first (highest-weight) query picks the excerpt
+        for rank, (pid, cid) in enumerate(cited):
+            scores[pid] = scores.get(pid, 0.0) + self.CITED_WEIGHT / (self.RRF_K + rank + 1)
+            best_chunk.setdefault(pid, cid)  ## excerpt from the earlier turn if not retrieved now
 
         ranked = sorted(scores, key=lambda p: -scores[p])[:k]  ## stable sort: ties keep insertion order
         return [(pid, best_chunk[pid]) for pid in ranked]
@@ -488,6 +514,36 @@ class TABot:
         if window == message:  ## first turn of a session: nothing to fuse
             return [(message, 1.0)]
         return [(message, self.RRF_CURRENT_WEIGHT), (window, 1.0)]
+
+    def _cited_ranking(self, session_id: str, message: str) -> list[tuple[str, str]]:
+        """
+        top CITED_PER_TURN papers cited in each of the last CITED_TURNS turns of the session, ranked
+        by summed reciprocal rank (a paper cited first in several turns comes first)
+        only for recap questions ("summarize all three ... we discussed"): those want the papers
+        already in the conversation, which the current message alone may not name; for other
+        follow-ups ("is there a simpler way?") earlier papers would push out the new one they ask for,
+        and an explicit topic switch turns it off as well
+        """
+        lowered = message.lower()
+        if (self.CITED_WEIGHT <= 0 or not re.search(RECAP_PATTERN, lowered)
+                or re.search(TOPIC_SWITCH_PATTERN, lowered)):
+            return []
+        ## earlier turns, most recent first, stopping at the last explicit topic switch (kept: it opened
+        ## the current topic) so papers from before the switch never come back
+        turns = []
+        for msg, hits in zip(reversed(self.sessions.get(session_id, [])), reversed(self.cited.get(session_id, []))):
+            if len(turns) == self.CITED_TURNS:
+                break
+            turns.append(hits)
+            if re.search(TOPIC_SWITCH_PATTERN, msg.lower()):
+                break
+        score: dict[str, float] = {}
+        chunk: dict[str, str] = {}
+        for turn in reversed(turns):
+            for rank, (pid, cid) in enumerate(turn[:self.CITED_PER_TURN]):
+                score[pid] = score.get(pid, 0.0) + 1.0 / (rank + 1)
+                chunk.setdefault(pid, cid)
+        return [(pid, chunk[pid]) for pid in sorted(score, key=lambda p: -score[p])]
 
     def _window_query(self, session_id: str, message: str) -> str:
         """
