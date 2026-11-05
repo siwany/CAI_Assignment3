@@ -84,6 +84,27 @@ REFUSE_PATTERNS = [
     ## other people's information ("my roommate is failing", "my friend asked")
     r"\bmy (friend|roommate|classmate|coworker|partner|girlfriend|boyfriend|wife|husband|mom|dad|"
     r"mother|father|parents?|brother|sister|son|daughter|kid)s?\b",
+    ## personal health beyond the terms above; research words like "medical" or "health" alone are allowed
+    r"\b(insomnia|autis\w*|adderall|ritalin|xanax|zoloft|prozac|lexapro|hospitali[sz]\w*|in the hospital|"
+    r"surgery|cancer|chemo\w*|ptsd|ocd|panic attacks?|eating disorder|suicid\w*|self[- ]harm|"
+    r"chronic (pain|illness)|illness|sick leave|medical (condition|leave|history|records?)|my (health|doctor))\b",
+    ## immigration status
+    r"\b(visas?|f-?1|j-?1|h-?1b|green card|asylum|refugee|deport\w*|international student)\b",
+    ## academic standing and discipline
+    r"\b(academic )?probation\b|\b(failing|flunk\w*|expelled|suspended|plagiari\w*|"
+    r"academic (integrity|misconduct)|my grades?|transcript)\b",
+    ## relationships and family situation
+    r"\b(divorc\w*|broke up|break ?up|separated from|married|engaged to|dating|widow\w*|custody)\b",
+    ## where the user lives, age, and birth date
+    r"\bi live (at|on|in|near)\b|\b\d+ \w+ (st|street|ave|avenue|rd|road|blvd|dr|drive|ln|lane|ct|court)\b"
+    r"|\b(zip ?code|apartment|apt)\b|\b\d{1,2}[- ]years?[- ]old\b|\bmy (age|birthday|date of birth)\b|\bborn (in|on)\b",
+    ## identity documents and other financial details
+    r"\b(student id|ssn|social security|passport|driver'?s licen[cs]e)\b"
+    r"|\b(financial aid|can'?t afford|bankrupt\w*|paycheck|net worth|my rent)\b",
+    ## legal trouble and political views stated about oneself
+    r"\b(arrested|convicted|criminal record|lawsuit|on parole)\b"
+    r"|\bi(?:[’']m| am) (a |an )?(republican|democrat|liberal|conservative|libertarian|socialist)\b"
+    r"|\bi voted\b|\bmy (political|politics)\b",
 ]
 ALLOW_PATTERNS = [
     r"\bi(?:[’']m| am) (a|an)\b.*\b(phd|master'?s?|ms|undergrad\w*|ta|student|researcher)\b",
@@ -98,6 +119,11 @@ ALLOW_PATTERNS = [
     r"\bi (really |especially |mostly )?(like|love|enjoy)\b",
     r"\bmy (favou?rite|preferred)\b",
     r"\bplease (always|keep|use|explain|cite|format)\b",
+    r"\bi(?:[’']m| am) (really |mostly )?into\b",
+    r"\bi want to (learn|understand|get better at|focus on|work on)\b",
+    r"\bmy (background|focus|area|field|specialty) (is|are)\b",
+    r"\bi care (most |a lot |mostly )?about\b",
+    r"\bi(?:[’']m| am) preparing for\b",
 ]
 
 ## "I'm Priya" style introductions; checked on the original casing so "i'm tired" doesn't match
@@ -106,6 +132,12 @@ NOT_NAMES = {
     "Not", "So", "Just", "Also", "Really", "Still", "Here", "Back", "Sorry", "Glad", "Happy",
     "Fine", "Good", "Done", "Currently", "Now", "Very", "Pretty", "Trying", "Looking", "Working",
     "Taking", "Writing", "Doing", "Interested", "Most", "Curious", "Confused", "Wondering", "New",
+    ## states and feelings ("I'm Exhausted.") that are capitalised but are not names
+    "Exhausted", "Tired", "Stressed", "Sick", "Okay", "Ok", "Sure", "Afraid", "Excited", "Busy", "Late",
+    "Ready", "Lost", "Stuck", "Bored", "Hungry", "Thankful", "Grateful", "Worried", "Nervous", "Excited",
+    "Overwhelmed", "Frustrated", "Sad", "Upset", "Angry", "Alone", "Unsure", "Positive", "Certain",
+    "Learning", "Studying", "Going", "Getting", "Thinking", "Planning", "Hoping", "Wanting", "Using",
+    "Able", "Unable", "Fairly", "Quite", "Kind", "Sort", "Always", "Never", "Usually", "Again",
 }
 
 ## explicit "don't remember this": nothing from that message is stored
@@ -469,8 +501,8 @@ class TABot:
     def _rewrite_query(self, session_id: str, message: str) -> str:
         """
         asks the LLM for a standalone keyword query given recent dialogue
-        the first turn is rewritten too: there is nothing to resolve, but the rewrite adds the
-        technical terms for questions phrased in everyday words
+        the first turn of a session is not rewritten: there is nothing to resolve, and added terms
+        only dilute the original keywords in the BM25 OR-query
         the original message is kept so a bad rewrite can only add terms, never drop them
         falls back to the current message alone if the rewrite is empty or too long,
         so rewrite on/off differs only in the rewrite itself
@@ -478,6 +510,8 @@ class TABot:
         from the rewriter, since a small model tends to carry the old topic over
         """
         history = self.history.get(session_id, [])[-2 * self.REWRITE_TURNS:]
+        if not history:
+            return message
         if re.search(TOPIC_SWITCH_PATTERN, message.lower()):
             history = []
 
